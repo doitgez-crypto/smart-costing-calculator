@@ -172,6 +172,7 @@ export type OutputRow = {
   rowIndex: number;
   label: string;
   value: string;
+  description?: string;
 };
 
 export type SettingsConfig = {
@@ -316,7 +317,7 @@ export async function getDynamicInputsAndOutputs(): Promise<{
   // A=0, B=1, ...
   const valueColumnIndex = OUTPUT_VALUE_COLUMN === "B" ? 1 : 0;
   const outputRanges = settings.outputRows.map(
-    (r) => sheetRange(main, `A${r}:${OUTPUT_VALUE_COLUMN}${r}`)
+    (r) => sheetRange(main, `A${r}:D${r}`)
   );
 
   const ranges = [...inputRanges, ...outputRanges];
@@ -369,12 +370,13 @@ export async function getDynamicInputsAndOutputs(): Promise<{
   const outputs: OutputRow[] = settings.outputRows.map((rowIndex, j) => {
     const base = settings.inputRows.length;
     const rowValues = values[base + j]?.values?.[0] ?? [];
-    const [labelRaw = ""] = rowValues as (string | number | boolean | null | undefined)[];
+    const [labelRaw = "", , , descriptionRaw = ""] = rowValues as (string | number | boolean | null | undefined)[];
     const valueRaw = (rowValues as any[])[valueColumnIndex];
     return {
       rowIndex,
       label: String(labelRaw),
-      value: valueRaw === undefined || valueRaw === null ? "" : String(valueRaw)
+      value: valueRaw === undefined || valueRaw === null ? "" : String(valueRaw),
+      description: descriptionRaw ? String(descriptionRaw) : undefined
     };
   });
 
@@ -383,6 +385,8 @@ export async function getDynamicInputsAndOutputs(): Promise<{
 
 export type CalculationInput = {
   rowIndex: number;
+  label: string;
+  description: string;
   value: string; // for % rows: user enters "25" meaning 25%
   isPercentage: boolean;
 };
@@ -424,14 +428,14 @@ export async function calculateAndLogOnSheet(params: {
     });
   }
 
-  // 2) Enforce 850ms delay
-  await new Promise((r) => setTimeout(r, 850));
+  // 2) Enforce 400ms delay
+  await new Promise((r) => setTimeout(r, 400));
 
   // 3) Read results
   const settings = await getSettingsConfig();
   const valueColumnIndex = OUTPUT_VALUE_COLUMN === "B" ? 1 : 0;
   const outputRanges = settings.outputRows.map(
-    (r) => sheetRange(main, `A${r}:${OUTPUT_VALUE_COLUMN}${r}`)
+    (r) => sheetRange(main, `A${r}:D${r}`)
   );
 
   const outputsRes = await sheets.spreadsheets.values.batchGet({
@@ -442,34 +446,50 @@ export async function calculateAndLogOnSheet(params: {
   const outputValues = outputsRes.data.valueRanges ?? [];
   const outputs: OutputRow[] = settings.outputRows.map((rowIndex, idx) => {
     const rowValues = outputValues[idx]?.values?.[0] ?? [];
-    const [labelRaw = ""] = rowValues as (string | number | boolean | null | undefined)[];
+    const [labelRaw = "", , , descriptionRaw = ""] = rowValues as (string | number | boolean | null | undefined)[];
     const valueRaw = (rowValues as any[])[valueColumnIndex];
     return {
       rowIndex,
       label: String(labelRaw),
-      value: valueRaw === undefined || valueRaw === null ? "" : String(valueRaw)
+      value: valueRaw === undefined || valueRaw === null ? "" : String(valueRaw),
+      description: descriptionRaw ? String(descriptionRaw) : undefined
     };
   });
 
   // 4) Log to History sheet
   const timestamp = new Date().toISOString();
-  const inputsForLog = inputs.map((i) => ({
-    rowIndex: i.rowIndex,
-    value: i.value,
-    isPercentage: i.isPercentage
-  }));
-  const resultsForLog = outputs.map((o) => ({
-    rowIndex: o.rowIndex,
-    label: o.label,
-    value: o.value
-  }));
+  
+  const inputsForLog = inputs.map((i) => {
+    const valStr = i.isPercentage ? `${i.value}%` : i.value;
+    let line = `📝 ${i.label}: ${valStr}`;
+    if (i.description) {
+      line += ` (${i.description})`;
+    }
+    return line;
+  }).join("\n");
+
+  const resultsForLog = outputs.map((o) => {
+    const icon = o.label.includes("מכירה") || o.label.includes("רווח") ? "💲" : "✅";
+    let valStr = o.value;
+    const cleanStr = valStr.replace(/[₪,%$]/g, "").trim();
+    const num = Number(cleanStr);
+    if (!Number.isNaN(num) && cleanStr !== "") {
+      valStr = `₪${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    
+    let line = `${icon} ${o.label}: ${valStr}`;
+    if (o.description) {
+      line += ` (${o.description})`;
+    }
+    return line;
+  }).join("\n");
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
     range: sheetRange(history, "A:D"),
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[timestamp, userName, JSON.stringify(inputsForLog), JSON.stringify(resultsForLog)]]
+      values: [[timestamp, userName, inputsForLog, resultsForLog]]
     }
   });
 

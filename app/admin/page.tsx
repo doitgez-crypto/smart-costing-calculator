@@ -95,7 +95,8 @@ export default function AdminPage() {
                 disabled={loading}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder=""
-                autoComplete="current-password"
+                autoComplete="off"
+                data-1p-ignore
               />
             </div>
             {error ? (

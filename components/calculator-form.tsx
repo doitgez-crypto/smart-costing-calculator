@@ -67,14 +67,18 @@ export function CalculatorForm({
     }
 
     setSyncing(true);
-    // Replace old values with loading UI.
-    setOutputs([]);
+    // Keep old outputs values for optimistic UI skeleton rendering.
     try {
-      const payloadInputs: CalculationInput[] = inputs.map((i) => ({
-        rowIndex: i.rowIndex,
-        value: i.value,
-        isPercentage: i.isPercentage
-      }));
+      const payloadInputs: CalculationInput[] = inputs.map((i) => {
+        const initial = initialInputs.find(init => init.rowIndex === i.rowIndex);
+        return {
+          rowIndex: i.rowIndex,
+          label: initial?.label || `שורה ${i.rowIndex}`,
+          description: initial?.description || "",
+          value: i.value,
+          isPercentage: i.isPercentage
+        };
+      });
 
       const res = await runCalculation({
         userName,
@@ -136,9 +140,6 @@ export function CalculatorForm({
                             </p>
                           ) : null}
                         </div>
-                        <div className="text-[10px] text-gray-400 pt-2 whitespace-nowrap">
-                          #{row.rowIndex}
-                        </div>
                       </div>
 
                       <div className="space-y-1">
@@ -196,7 +197,7 @@ export function CalculatorForm({
 
                   <div className="flex items-center gap-2 text-xs text-gray-500 whitespace-nowrap rtl:flex-row-reverse">
                     <RefreshCcw className="w-3 h-3" />
-                    <span>עיכוב 850ms מול Sheets</span>
+                    <span>עיכוב 400ms מול Sheets</span>
                   </div>
                 </div>
               </div>
@@ -215,36 +216,30 @@ export function CalculatorForm({
               </p>
             ) : (
               <div className="space-y-3">
-                {syncing ? (
-                  <div className="flex flex-col items-center justify-center gap-2 py-6 text-sm text-gray-600">
-                    <Spinner className="h-5 w-5" />
-                    <span>מחשב נתונים...</span>
-                    <div className="w-full max-w-[320px] space-y-2">
-                      <div className="h-3 rounded bg-gray-100 animate-pulse" />
-                      <div className="h-3 rounded bg-gray-100 animate-pulse" />
-                      <div className="h-3 rounded bg-gray-100 animate-pulse" />
-                    </div>
-                  </div>
-                ) : (
-                  outputs.map((o) => (
+                {outputs.map((o) => (
                   <div
                     key={o.rowIndex}
-                    className="flex items-center justify-between border-b border-gray-100 pb-2 last:border-b-0 last:pb-0"
+                    className={`flex items-start justify-between border-b border-gray-100 pb-3 last:border-b-0 last:pb-0 ${syncing ? 'opacity-60' : ''}`}
                   >
-                    <div className="flex flex-col items-end">
-                      <span className="text-sm font-medium">
+                    <div className="flex flex-col max-w-[70%]">
+                      <span className="text-sm font-medium text-right">
                         {o.label || `שורה ${o.rowIndex}`}
                       </span>
-                      <span className="text-[10px] text-gray-400">
-                        #{o.rowIndex}
-                      </span>
+                      {o.description ? (
+                        <p className="text-xs text-gray-500 text-right pt-0.5 whitespace-pre-line">
+                          {o.description}
+                        </p>
+                      ) : null}
                     </div>
-                    <div className="text-sm font-semibold text-blue-700">
-                      {o.value}
+                    <div className="text-sm font-semibold text-blue-700 whitespace-nowrap pt-0.5">
+                      {syncing ? (
+                        <div className="h-5 w-14 bg-gray-200 rounded animate-pulse" />
+                      ) : (
+                        o.value
+                      )}
                     </div>
                   </div>
-                  ))
-                )}
+                ))}
 
                 {lastUpdated ? (
                   <p className="text-[11px] text-gray-400 text-right pt-3 border-t border-gray-100">
