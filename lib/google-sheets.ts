@@ -1,4 +1,7 @@
+"use server";
+
 import { google } from "googleapis";
+import { parseRowList } from "@/lib/row-parsing";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
@@ -206,45 +209,7 @@ function getAuthClient(): SheetsAuth {
   return { jwt, spreadsheetId: normalizedSpreadsheetId };
 }
 
-// תומך בקלט כמו: "19-22, 25" -> [19,20,21,22,25]
-export function parseRowList(
-  value: string | undefined | null
-): number[] {
-  if (!value) return [];
-
-  const normalized = String(value).replace(/[–—]/g, "-");
-  const parts = normalized
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean);
-
-  const result: number[] = [];
-  const seen = new Set<number>();
-
-  const pushUnique = (n: number) => {
-    if (!Number.isFinite(n) || n <= 0) return;
-    if (seen.has(n)) return;
-    seen.add(n);
-    result.push(n);
-  };
-
-  for (const part of parts) {
-    const rangeMatch = part.match(/^(\d+)\s*-\s*(\d+)$/);
-    if (rangeMatch) {
-      const a = Number(rangeMatch[1]);
-      const b = Number(rangeMatch[2]);
-      const start = Math.min(a, b);
-      const end = Math.max(a, b);
-      for (let i = start; i <= end; i++) pushUnique(i);
-      continue;
-    }
-
-    const n = Number(part);
-    pushUnique(n);
-  }
-
-  return result;
-}
+// parseRowList is imported from `lib/row-parsing.ts`
 
 function parseMaybeNumber(value: string | undefined | null): number | null {
   if (value === undefined || value === null) return null;
