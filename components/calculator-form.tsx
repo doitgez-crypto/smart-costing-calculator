@@ -67,6 +67,8 @@ export function CalculatorForm({
     }
 
     setSyncing(true);
+    // Replace old values with loading UI.
+    setOutputs([]);
     try {
       const payloadInputs: CalculationInput[] = inputs.map((i) => ({
         rowIndex: i.rowIndex,
@@ -139,24 +141,34 @@ export function CalculatorForm({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          step="any"
-                          inputMode="decimal"
-                          value={value}
-                          disabled={syncing}
-                          onChange={(e) =>
-                            handleInputChange(row.rowIndex, e.target.value)
-                          }
-                          placeholder={
-                            row.isPercentage ? "לדוגמה: 25 עבור 25%" : "הכנס ערך"
-                          }
-                        />
-                        {row.isPercentage ? (
-                          <span className="text-sm text-gray-700 whitespace-nowrap">
-                            %
-                          </span>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            step="any"
+                            inputMode="decimal"
+                            value={value}
+                            disabled={syncing}
+                            onChange={(e) =>
+                              handleInputChange(row.rowIndex, e.target.value)
+                            }
+                            placeholder={
+                              row.isPercentage
+                                ? "לדוגמה: 25 עבור 25%"
+                                : "הכנס ערך"
+                            }
+                          />
+                          {row.isPercentage ? (
+                            <span className="text-sm text-gray-700 whitespace-nowrap">
+                              %
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {row.hint ? (
+                          <p className="text-[12px] italic text-gray-500 text-right">
+                            {row.hint}
+                          </p>
                         ) : null}
                       </div>
                     </div>
@@ -178,7 +190,7 @@ export function CalculatorForm({
                         <span>מחשב ומסנכרן...</span>
                       </>
                     ) : (
-                      <span>Calculate</span>
+                      <span>חשב</span>
                     )}
                   </Button>
 
@@ -192,7 +204,7 @@ export function CalculatorForm({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-blue-50/25 border-blue-100">
           <CardHeader>
             <CardTitle>תוצאות</CardTitle>
           </CardHeader>
@@ -203,7 +215,18 @@ export function CalculatorForm({
               </p>
             ) : (
               <div className="space-y-3">
-                {outputs.map((o) => (
+                {syncing ? (
+                  <div className="flex flex-col items-center justify-center gap-2 py-6 text-sm text-gray-600">
+                    <Spinner className="h-5 w-5" />
+                    <span>מחשב נתונים...</span>
+                    <div className="w-full max-w-[320px] space-y-2">
+                      <div className="h-3 rounded bg-gray-100 animate-pulse" />
+                      <div className="h-3 rounded bg-gray-100 animate-pulse" />
+                      <div className="h-3 rounded bg-gray-100 animate-pulse" />
+                    </div>
+                  </div>
+                ) : (
+                  outputs.map((o) => (
                   <div
                     key={o.rowIndex}
                     className="flex items-center justify-between border-b border-gray-100 pb-2 last:border-b-0 last:pb-0"
@@ -220,7 +243,8 @@ export function CalculatorForm({
                       {o.value}
                     </div>
                   </div>
-                ))}
+                  ))
+                )}
 
                 {lastUpdated ? (
                   <p className="text-[11px] text-gray-400 text-right pt-3 border-t border-gray-100">

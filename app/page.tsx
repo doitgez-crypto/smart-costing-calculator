@@ -24,7 +24,7 @@ export default async function Page() {
         <div className="flex items-center justify-end">
           <Link
             href="/admin"
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-white/60 px-3 py-2 text-sm text-gray-700 hover:bg-white transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-white/60 px-3 py-2 text-sm text-gray-700 hover:bg-white transition-colors"
           >
             <SettingsIcon className="w-4 h-4 text-blue-600" />
             <span className="whitespace-nowrap">הגדרות</span>

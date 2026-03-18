@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  serverComponentsExternalPackages: ["googleapis"],
   // Some dependencies (like googleapis) are server-only and may reference Node internals.
   // This fallback helps avoid client-side bundling errors on platforms like Vercel.
   webpack: (config) => {

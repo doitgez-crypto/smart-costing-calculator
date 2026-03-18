@@ -17,9 +17,8 @@ const REQUESTED_SHEET_SETTINGS =
 const REQUESTED_SHEET_HISTORY =
   process.env.GOOGLE_SHEET_HISTORY_NAME || DEFAULT_SHEET_HISTORY;
 
-// הנחת ברירת מחדל: תוצאת Output נמצאת בעמודה D בגיליון Main.
-// אם אצלך התוצאה בעמודה אחרת, עדכן כאן בלבד.
-const OUTPUT_VALUE_COLUMN = "D";
+// Output הערך הסופי נמצא בעמודה B (ה"מנוע" של החישוב).
+const OUTPUT_VALUE_COLUMN = "B";
 
 function normalizeEnvValue(value: string): string {
   // dotenv usually strips quotes, but when copying/pasting it's easy to end up
@@ -165,6 +164,7 @@ export type InputRow = {
   label: string;
   value: string; // לתצוגה בלבד (ב-% כבר הומר לאחוזים)
   description: string;
+  hint: string; // Column D: טקסט מדריך מתחת לשדה הקלט
   isPercentage: boolean;
 };
 
@@ -181,7 +181,9 @@ export type SettingsConfig = {
 };
 
 type SheetsAuth = {
-  jwt: ReturnType<typeof google.auth.JWT>;
+  // googleapis types can be finicky on some platforms (Vercel/Next).
+  // We intentionally loosen typing here: this file is server-only.
+  jwt: any;
   spreadsheetId: string;
 };
 
@@ -306,11 +308,13 @@ export async function getDynamicInputsAndOutputs(): Promise<{
   const { main } = await resolveSheetTitles(sheets, spreadsheetId);
   await assertSheetAccessible(sheets, spreadsheetId, main);
 
-  const inputRanges = settings.inputRows.map(
-    (r) => sheetRange(main, `A${r}:C${r}`)
+  const inputRanges = settings.inputRows.map((r) =>
+    sheetRange(main, `A${r}:D${r}`)
   );
 
-  const valueColumnIndex = OUTPUT_VALUE_COLUMN === "D" ? 3 : 0; // only D is expected here
+  // We fetch output as A:OUTPUT_VALUE_COLUMN, so:
+  // A=0, B=1, ...
+  const valueColumnIndex = OUTPUT_VALUE_COLUMN === "B" ? 1 : 0;
   const outputRanges = settings.outputRows.map(
     (r) => sheetRange(main, `A${r}:${OUTPUT_VALUE_COLUMN}${r}`)
   );
@@ -335,7 +339,12 @@ export async function getDynamicInputsAndOutputs(): Promise<{
 
   const inputs: InputRow[] = settings.inputRows.map((rowIndex, i) => {
     const rowValues = values[i]?.values?.[0] ?? [];
-    const [labelRaw = "", valueRaw = "", descriptionRaw = ""] = rowValues as (
+    const [
+      labelRaw = "",
+      valueRaw = "",
+      descriptionRaw = "",
+      hintRaw = ""
+    ] = rowValues as (
       | string
       | number
       | boolean
@@ -352,6 +361,7 @@ export async function getDynamicInputsAndOutputs(): Promise<{
       label: String(labelRaw),
       value: displayValue,
       description: String(descriptionRaw),
+      hint: String(hintRaw),
       isPercentage
     };
   });
@@ -419,7 +429,7 @@ export async function calculateAndLogOnSheet(params: {
 
   // 3) Read results
   const settings = await getSettingsConfig();
-  const valueColumnIndex = OUTPUT_VALUE_COLUMN === "D" ? 3 : 0;
+  const valueColumnIndex = OUTPUT_VALUE_COLUMN === "B" ? 1 : 0;
   const outputRanges = settings.outputRows.map(
     (r) => sheetRange(main, `A${r}:${OUTPUT_VALUE_COLUMN}${r}`)
   );

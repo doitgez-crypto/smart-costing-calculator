@@ -83,8 +83,7 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-gray-600 text-right">
-              להזנת/עריכת ההגדרות נדרשת סיסמת מנהל. הסיסמה:{" "}
-              <span className="font-semibold">ADMIN</span>.
+              להזנת/עריכת ההגדרות נדרשת סיסמת מנהל.
             </p>
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-800 block text-right">
@@ -95,7 +94,7 @@ export default function AdminPage() {
                 value={password}
                 disabled={loading}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="ADMIN"
+                placeholder=""
                 autoComplete="current-password"
               />
             </div>
