@@ -7,7 +7,7 @@ import type { HistoryLogEntry } from "@/lib/google-sheets";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 
 export function HistoryClientView({ logs }: { logs: HistoryLogEntry[] }) {
-  const containerVariants = {
+  const containerVariants: any = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -15,7 +15,7 @@ export function HistoryClientView({ logs }: { logs: HistoryLogEntry[] }) {
     }
   };
 
-  const itemVariants = {
+  const itemVariants: any = {
     hidden: { opacity: 0, x: 20 },
     show: { opacity: 1, x: 0, transition: { type: "spring", bounce: 0.2 } }
   };

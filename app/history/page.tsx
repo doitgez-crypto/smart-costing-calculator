@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export const revalidate = 0;
 
 export default async function HistoryPage() {
-  let logs = [];
+  let logs: any[] = [];
   try {
     logs = await getHistoryLogs();
     // Remove the very first row since it's likely the header row (timestamp, user, inputs, results)
