@@ -520,3 +520,30 @@ export async function calculateAndLogOnSheet(params: {
   return { outputs };
 }
 
+export type HistoryLogEntry = {
+  timestamp: string;
+  userName: string;
+  inputs: string;
+  results: string;
+};
+
+export async function getHistoryLogs(): Promise<HistoryLogEntry[]> {
+  const { spreadsheetId, sheets } = sheetsClient();
+  const { history } = await resolveSheetTitles(sheets, spreadsheetId);
+  await assertSheetAccessible(sheets, spreadsheetId, history);
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: sheetRange(history, "A:D")
+  });
+
+  const rows = res.data.values || [];
+  return rows.map((row) => ({
+    timestamp: row[0] || "",
+    userName: row[1] || "",
+    inputs: row[2] || "",
+    results: row[3] || ""
+  })).reverse(); // show newest first
+}
+
+

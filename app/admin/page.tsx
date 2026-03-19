@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { ArrowRight, Settings as SettingsIcon, Save, Clock } from "lucide-react";
 import { loadSettings, updateSettings } from "@/app/actions";
 import { parseRowList } from "@/lib/row-parsing";
 import type { SettingsConfig } from "@/lib/google-sheets";
+import Link from "next/link";
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
@@ -118,7 +120,28 @@ export default function AdminPage() {
     <div className="max-w-2xl mx-auto space-y-6" dir="rtl">
       <Card className="shadow-2xl border-white/60 bg-white/80 backdrop-blur-xl rounded-2xl">
         <CardHeader>
-          <CardTitle>ניהול הגדרות מחשבון</CardTitle>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <h2 className="text-2xl font-bold flex items-center gap-2 text-slate-800">
+              <SettingsIcon className="w-6 h-6 text-blue-600" />
+              הגדרות מחשבון
+            </h2>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/history"
+                className="inline-flex items-center gap-2 rounded-xl border border-border bg-white/60 px-4 py-2 text-sm text-gray-700 hover:bg-white transition-colors"
+              >
+                <Clock className="w-4 h-4 text-blue-600" />
+                <span>היסטוריה</span>
+              </Link>
+              <Link
+                href="/"
+                className="inline-flex items-center gap-2 rounded-xl border border-border bg-white/60 px-4 py-2 text-sm text-gray-700 hover:bg-white transition-colors"
+              >
+                <ArrowRight className="w-4 h-4" />
+                <span>חזרה למחשבון</span>
+              </Link>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-5">
           {loading ? (
