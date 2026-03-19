@@ -190,7 +190,7 @@ type SheetsAuth = {
 
 function getAuthClient(): SheetsAuth {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const rawKey = process.env.GOOGLE_PRIVATE_KEY;
+  const rawKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
   const spreadsheetId = process.env.SPREADSHEET_ID;
 
   if (!email || !rawKey || !spreadsheetId) {
