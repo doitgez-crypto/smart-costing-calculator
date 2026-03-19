@@ -15,11 +15,8 @@ export default async function Page() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <p className="text-sm text-gray-600 text-right">
-          המחשבון מחובר ל־Google Sheets. שורות קלט/פלט מוגדרות בלשונית{" "}
-          <span className="font-medium">Settings</span> ומשמשות לבניית ה־UI.
-        </p>
+      <div className="flex flex-col md:flex-row items-end md:items-start justify-between gap-4">
+
 
         <div className="flex items-center justify-end">
           <Link

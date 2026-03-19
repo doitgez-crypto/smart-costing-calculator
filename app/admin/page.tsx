@@ -77,7 +77,7 @@ export default function AdminPage() {
   if (!authed) {
     return (
       <div className="max-w-sm mx-auto" dir="rtl">
-        <Card>
+        <Card className="shadow-2xl border-white/60 bg-white/80 backdrop-blur-xl rounded-2xl">
           <CardHeader>
             <CardTitle>כניסת מנהל</CardTitle>
           </CardHeader>
@@ -93,6 +93,7 @@ export default function AdminPage() {
                 type="password"
                 value={password}
                 disabled={loading}
+                className="text-base sm:text-sm rounded-2xl bg-white/50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all border-gray-200 focus:border-blue-400"
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder=""
                 autoComplete="off"
@@ -102,8 +103,8 @@ export default function AdminPage() {
             {error ? (
               <p className="text-sm text-red-600 text-right">{error}</p>
             ) : null}
-            <div className="flex justify-end">
-              <Button onClick={login} disabled={loading}>
+            <div className="flex justify-end pt-2">
+              <Button className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/30 transition-all duration-300 hover:shadow-blue-600/50 rounded-2xl" onClick={login} disabled={loading}>
                 כניסה
               </Button>
             </div>
@@ -115,7 +116,7 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6" dir="rtl">
-      <Card>
+      <Card className="shadow-2xl border-white/60 bg-white/80 backdrop-blur-xl rounded-2xl">
         <CardHeader>
           <CardTitle>ניהול הגדרות מחשבון</CardTitle>
         </CardHeader>
@@ -134,6 +135,7 @@ export default function AdminPage() {
                 <Input
                   value={inputRowsStr}
                   disabled={saving}
+                  className="text-base sm:text-sm rounded-2xl bg-white/50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all border-gray-200 focus:border-blue-400"
                   onChange={(e) => setInputRowsStr(e.target.value)}
                   placeholder="לדוגמה: 19-22, 25"
                 />
@@ -146,6 +148,7 @@ export default function AdminPage() {
                 <Input
                   value={outputRowsStr}
                   disabled={saving}
+                  className="text-base sm:text-sm rounded-2xl bg-white/50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all border-gray-200 focus:border-blue-400"
                   onChange={(e) => setOutputRowsStr(e.target.value)}
                   placeholder="לדוגמה: 10,11-12"
                 />
@@ -158,6 +161,7 @@ export default function AdminPage() {
                 <Input
                   value={percentageRowsStr}
                   disabled={saving}
+                  className="text-base sm:text-sm rounded-2xl bg-white/50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all border-gray-200 focus:border-blue-400"
                   onChange={(e) => setPercentageRowsStr(e.target.value)}
                   placeholder="לדוגמה: 4,7-9"
                 />
@@ -170,8 +174,8 @@ export default function AdminPage() {
                 <p className="text-sm text-green-600 text-right">{saveMessage}</p>
               ) : null}
 
-              <div className="flex justify-end gap-3 pt-2">
-                <Button onClick={save} disabled={saving}>
+              <div className="flex justify-end pt-2 mt-4 sm:mt-2">
+                <Button className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/30 transition-all duration-300 hover:shadow-blue-600/50 rounded-2xl" onClick={save} disabled={saving}>
                   {saving ? (
                     <>
                       <Spinner />

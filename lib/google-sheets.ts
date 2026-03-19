@@ -228,6 +228,14 @@ function numberToCleanString(n: number): string {
   return n.toString();
 }
 
+function maskError(val: string): string {
+  if (!val) return val;
+  if (val.includes("#DIV/0!") || val.includes("#VALUE!") || val.includes("#REF!") || val.includes("!VALUE#")) {
+    return "חסר נתון";
+  }
+  return val;
+}
+
 function sheetsClient() {
   const { jwt, spreadsheetId } = getAuthClient();
   return { jwt, spreadsheetId, sheets: google.sheets({ version: "v4", auth: jwt }) };
@@ -372,10 +380,11 @@ export async function getDynamicInputsAndOutputs(): Promise<{
     const rowValues = values[base + j]?.values?.[0] ?? [];
     const [labelRaw = "", , , descriptionRaw = ""] = rowValues as (string | number | boolean | null | undefined)[];
     const valueRaw = (rowValues as any[])[valueColumnIndex];
+    const valString = valueRaw === undefined || valueRaw === null ? "" : String(valueRaw);
     return {
       rowIndex,
       label: String(labelRaw),
-      value: valueRaw === undefined || valueRaw === null ? "" : String(valueRaw),
+      value: maskError(valString),
       description: descriptionRaw ? String(descriptionRaw) : undefined
     };
   });
@@ -448,10 +457,11 @@ export async function calculateAndLogOnSheet(params: {
     const rowValues = outputValues[idx]?.values?.[0] ?? [];
     const [labelRaw = "", , , descriptionRaw = ""] = rowValues as (string | number | boolean | null | undefined)[];
     const valueRaw = (rowValues as any[])[valueColumnIndex];
+    const valString = valueRaw === undefined || valueRaw === null ? "" : String(valueRaw);
     return {
       rowIndex,
       label: String(labelRaw),
-      value: valueRaw === undefined || valueRaw === null ? "" : String(valueRaw),
+      value: maskError(valString),
       description: descriptionRaw ? String(descriptionRaw) : undefined
     };
   });
@@ -479,7 +489,7 @@ export async function calculateAndLogOnSheet(params: {
     
     let line = `${icon} ${o.label}: ${valStr}`;
     if (o.description) {
-      line += ` (${o.description})`;
+      line += `\n(${o.description})`;
     }
     return line;
   }).join("\n");
