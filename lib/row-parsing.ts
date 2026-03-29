@@ -2,9 +2,15 @@
 // Supports numbers and ranges: "19-22, 25" => [19,20,21,22,25]
 
 export function parseRowList(value: string | undefined | null): number[] {
-  if (!value) return [];
+  if (!value || typeof value !== 'string') return [];
 
-  const normalized = String(value).replace(/[–—]/g, "-");
+  // Strict Validation: Only allow digits, commas, spaces, and valid dashes
+  if (!/^[\d\s,\-–—]+$/.test(value)) {
+    console.warn("Invalid row list format provided:", value);
+    return [];
+  }
+
+  const normalized = value.replace(/[–—]/g, "-");
   const parts = normalized
     .split(",")
     .map((v) => v.trim())

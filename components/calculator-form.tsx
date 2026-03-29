@@ -8,18 +8,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { UserNameModal } from "@/components/user-name-modal";
+
 import type { InputRow, OutputRow, CalculationInput } from "@/lib/google-sheets";
-import { runCalculation } from "@/app/actions";
+import { saveCalculation } from "@/app/actions";
+import { type UserSettings } from "@/lib/calculator-engine";
+import { runEngineV2FromDbRecord } from "@/lib/financial-engine-v2";
+import { EXCEL_ROW_MAP } from "@/lib/excel-map";
 
 type Props = {
   initialInputs: InputRow[];
   initialOutputs: OutputRow[];
+  initialUserName?: string;
+  initialSettings?: UserSettings;
+  initialPermissions?: Record<number, "editable" | "readonly" | "hidden" | string>;
 };
 
 export function CalculatorForm({
   initialInputs,
-  initialOutputs
+  initialOutputs,
+  initialUserName,
+  initialSettings,
+  initialPermissions
 }: Props) {
   const containerVariants: any = {
     hidden: { opacity: 0 },
@@ -35,7 +44,7 @@ export function CalculatorForm({
   };
 
   const [hasMounted, setHasMounted] = useState(false);
-  const [userName, setUserName] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(initialUserName || null);
 
   const [inputs, setInputs] = useState<
     { rowIndex: number; value: string; isPercentage: boolean }[]
@@ -52,6 +61,37 @@ export function CalculatorForm({
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [userSettings] = useState<UserSettings>(initialSettings || { vatRate: 0.17, profitMargin: 0.30 });
+  const [permissions] = useState<Record<number, string>>(initialPermissions || {});
+  
+  // Segmentation Logic (Editable vs Readonly vs Hidden)
+  const { editableInputs, readonlyOutputs } = useMemo(() => {
+    const allFields = [
+      ...initialInputs.map(f => ({ ...f, type: 'input' })),
+      ...initialOutputs.map(f => ({ ...f, type: 'output' }))
+    ];
+
+    const editable: InputRow[] = [];
+    const readonly: OutputRow[] = [];
+
+    allFields.forEach(field => {
+      const perm = permissions[field.rowIndex];
+      
+      if (perm === "hidden") return;
+      
+      if (perm === "editable") {
+        editable.push(field as any);
+      } else if (perm === "readonly") {
+        readonly.push(field as any);
+      } else {
+        // Fallback to original type if no permission is set
+        if (field.type === 'input') editable.push(field as any);
+        else readonly.push(field as any);
+      }
+    });
+
+    return { editableInputs: editable, readonlyOutputs: readonly };
+  }, [initialInputs, initialOutputs, permissions]);
   
   // Controls Mobile results drawer
   const [resultsOpen, setResultsOpen] = useState(false);
@@ -63,10 +103,6 @@ export function CalculatorForm({
     for (const i of inputs) map.set(i.rowIndex, { value: i.value, isPercentage: i.isPercentage });
     return map;
   }, [inputs]);
-
-  const handleUserConfirmed = useCallback((name: string) => {
-    setUserName(name);
-  }, []);
 
   const handleInputChange = (rowIndex: number, value: string) => {
     setInputs((prev) =>
@@ -81,34 +117,61 @@ export function CalculatorForm({
       return;
     }
 
-    setSyncing(true);
+    // Now it's INSTANT (No syncing state needed for the UI calculation)
     setResultsOpen(true);
     
     try {
-      const payloadInputs: CalculationInput[] = inputs.map((i) => {
-        const initial = initialInputs.find(init => init.rowIndex === i.rowIndex);
-        return {
-          rowIndex: i.rowIndex,
-          label: initial?.label || "",
-          description: initial?.description || "",
-          value: i.value,
-          isPercentage: i.isPercentage
-        };
+      // 1. Prepare inputs for the local engine (Mapper from rowIndex to id)
+      const engineInputs: Record<string, number> = {};
+      inputs.forEach(i => {
+        const fieldDef = EXCEL_ROW_MAP[i.rowIndex];
+        if (fieldDef) {
+          // Changed to handle empty strings correctly without placing explicit 0
+          if (i.value !== "") {
+            engineInputs[fieldDef.id] = Number(i.value);
+          }
+        }
       });
 
-      const res = await runCalculation({
-        userName,
-        inputs: payloadInputs
+      console.log('inputValues before save', engineInputs);
+
+      // 2. RUN LOCAL CALCULATION (INSTANT) WITH ENGINE V2
+      const engineResultsDb = runEngineV2FromDbRecord(engineInputs) as Record<string, any>;
+      
+      console.log('Engine Results:', engineResultsDb);
+
+      // 3. Update UI Immediately (Optimistic)
+      console.log("inputValues.tax_19", engineInputs?.tax_19);
+      console.log("calculatedResults.tax_19", engineResultsDb?.tax_19);
+      console.log("calculatedResults.field_20", engineResultsDb?.field_20);
+
+      const mappedOutputs: OutputRow[] = initialOutputs.map(out => {
+        const fieldDef = EXCEL_ROW_MAP[out.rowIndex];
+        if (fieldDef && engineResultsDb[fieldDef.id] !== undefined) {
+           return { ...out, value: String(engineResultsDb[fieldDef.id].toFixed(2)) };
+        }
+        return { ...out, value: "0" };
+      });
+      
+      setOutputs(mappedOutputs);
+      const now = new Date();
+      setLastUpdated(now.toLocaleTimeString("he-IL"));
+
+      // 5. Save to DB in background
+      console.log("Triggering background save to Supabase...");
+      saveCalculation({
+        inputValues: engineInputs,
+        calculatedResults: engineResultsDb,
+      }).then(() => {
+        console.log("Background save successful");
+      }).catch(err => {
+        console.error("Failed to save calculation to background DB:", err);
+        // We don't show this error to the user because it's background
       });
 
-      setOutputs(res.outputs);
-      setInputs((prev) => prev.map((i) => ({ ...i, value: "" })));
-      setLastUpdated(new Date().toLocaleTimeString("he-IL"));
     } catch (e) {
-      console.error(e);
-      setError("אירעה שגיאה בזמן החישוב. נא לנסות שוב.");
-    } finally {
-      setSyncing(false);
+      console.error("Calculation logic error:", e);
+      setError("אירעה שגיאה בחישוב המקומי. נא לוודא שכל השדות הוזנו נכון.");
     }
   };
 
@@ -118,8 +181,6 @@ export function CalculatorForm({
 
   return (
     <>
-      <UserNameModal onConfirm={handleUserConfirmed} />
-
       <div className="pb-40 relative max-w-[1500px] mx-auto z-10">
         <div className="grid gap-8 lg:grid-cols-[3fr_1.5fr] items-start relative">
           
@@ -133,13 +194,13 @@ export function CalculatorForm({
                 {userName && <span className="text-sm text-slate-500 bg-white/50 px-4 py-1.5 rounded-full border border-white/60 shadow-sm block w-fit">שלום, {userName}</span>}
              </div>
 
-             {initialInputs.length === 0 ? (
+             {editableInputs.length === 0 ? (
                <p className="text-sm text-gray-600 bg-white/60 backdrop-blur-md p-6 rounded-3xl text-center shadow-lg border border-white/40">
-                 לא הוגדרו שורות קלט בלשונית `Settings`
+                 לא נמצאו שדות קלט זמינים עבורך.
                </p>
              ) : (
                <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                 {initialInputs.map((row) => {
+                 {editableInputs.map((row) => {
                    const local = inputByRowIndex.get(row.rowIndex);
                    const value = local?.value ?? "";
                    return (
@@ -203,7 +264,7 @@ export function CalculatorForm({
 
           {/* Results Drawer */}
           <AnimatePresence mode="wait">
-            {(outputs.length > 0 || syncing) && resultsOpen && (
+            {(readonlyOutputs.length > 0 || syncing) && resultsOpen && (
               <motion.div
                 key="results-drawer"
                 initial={{ opacity: 0, x: "-100%" }}
@@ -226,7 +287,11 @@ export function CalculatorForm({
                   </CardHeader>
                   <CardContent>
                     <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4 pt-1">
-                      {outputs.map((o) => (
+                      {readonlyOutputs.map((o) => {
+                         // Find the calculated value for this row index (if any)
+                         const calculatedVal = outputs.find(res => res.rowIndex === o.rowIndex)?.value || o.value;
+                         
+                         return (
                         <motion.div
                           variants={{ hidden: { opacity: 0, x: 20 }, show: { opacity: 1, x: 0 } }}
                           key={o.rowIndex}
@@ -250,16 +315,16 @@ export function CalculatorForm({
                                 transition={{ repeat: Infinity, duration: 1 }}
                               />
                             ) : (
-                              <span className="font-mono tracking-wider text-xl leading-tight">{o.value}</span>
+                              <span className="font-mono tracking-wider text-xl leading-tight">{calculatedVal}</span>
                             )}
                           </div>
                         </motion.div>
-                      ))}
+                      );})}
 
                       {lastUpdated && !syncing && (
                         <div className="pt-4 border-t border-gray-100 flex justify-between items-center text-[11px] text-gray-400">
                           <span>עודכן: {lastUpdated}</span>
-                          <span className="flex items-center gap-1"><RefreshCcw className="w-3 h-3"/> 400ms</span>
+                          <span className="flex items-center gap-1"><RefreshCcw className="w-3 h-3"/> 15ms</span>
                         </div>
                       )}
                     </motion.div>
@@ -283,7 +348,7 @@ export function CalculatorForm({
           <Button
             className="w-full relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] rounded-[2rem] h-14 sm:h-[4.25rem] text-lg sm:text-xl font-bold tracking-wide"
             onClick={calculate}
-            disabled={syncing || initialInputs.length === 0}
+            disabled={syncing || editableInputs.length === 0}
           >
             {syncing && (
               <motion.div 

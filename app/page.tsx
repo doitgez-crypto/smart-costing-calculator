@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
-import { getDynamicInputsAndOutputs } from "@/lib/google-sheets";
+import { getFieldsFromConfig } from "@/lib/calculator-config";
 import { CalculatorForm } from "@/components/calculator-form";
 import Link from "next/link";
 import { Settings as SettingsIcon, Clock } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { getUserSettings, getUserProfile, type SettingsConfig } from "@/app/actions";
 
 export const metadata: Metadata = {
   title: "מחשבון עלויות חכם"
@@ -11,7 +13,54 @@ export const metadata: Metadata = {
 export const revalidate = 0;
 
 export default async function Page() {
-  const { inputs, outputs } = await getDynamicInputsAndOutputs();
+  const supabase = await createClient();
+  let user = null;
+  let userName = "משתמש";
+
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+    if (user) {
+      userName = user.user_metadata?.first_name || user.email?.split('@')[0] || "משתמש";
+    }
+  } catch (err) {
+    console.error("Error fetching user in Root Page:", err);
+  }
+
+  let settings: SettingsConfig = { 
+    inputRows: [4, 5, 6, 19, 20, 21, 25, 30], 
+    outputRows: [76, 109, 114, 115, 116], 
+    percentageRows: [7, 25, 30],
+    vatRate: 0.17, 
+    profitMargin: 0.30 
+  };
+  let profile = { ui_permissions: {}, field_configs: {}, display_settings: {} };
+  
+  try {
+    const [s, p] = await Promise.all([
+      getUserSettings(),
+      getUserProfile()
+    ]);
+    if (s) settings = s;
+    if (p) profile = p;
+  } catch (err) {
+    console.error("Error loading Supabase data:", err);
+  }
+
+  const { inputs, outputs } = getFieldsFromConfig(profile.field_configs, profile.display_settings || settings);
+
+  // Cast to the expected types since the library might have optional fields
+  const typedInputs = inputs.map(i => ({
+    ...i,
+    description: i.description || "",
+    hint: i.hint || "",
+    isPercentage: !!i.isPercentage
+  }));
+
+  const typedOutputs = outputs.map(o => ({
+    ...o,
+    description: o.description || ""
+  }));
 
   return (
     <div className="space-y-6 relative">
@@ -23,7 +72,17 @@ export default async function Page() {
         <SettingsIcon className="w-5 h-5 text-gray-700 group-hover:text-blue-600 transition-colors" />
       </Link>
 
-      <CalculatorForm initialInputs={inputs} initialOutputs={outputs} />
+      <CalculatorForm 
+        initialInputs={typedInputs as any} 
+        initialOutputs={typedOutputs as any} 
+        initialUserName={userName} 
+        initialSettings={{
+          ...settings,
+          vatRate: settings.vatRate ?? 0.17,
+          profitMargin: settings.profitMargin ?? 0.30
+        }}
+        initialPermissions={profile?.ui_permissions || {}}
+      />
     </div>
   );
 }

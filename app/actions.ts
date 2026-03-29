@@ -1,13 +1,30 @@
 "use server";
 
+import { createClient } from "@/lib/supabase/server";
+
 import {
   calculateAndLogOnSheet,
   getSettingsConfig,
   saveSettingsConfig,
   type CalculationInput,
-  type SettingsConfig
 } from "@/lib/google-sheets";
 import { revalidatePath } from "next/cache";
+
+export type SettingsConfig = {
+  inputRows: number[];
+  outputRows: number[];
+  percentageRows: number[];
+  monthlyRows?: number[];
+  vatRate?: number;
+  profitMargin?: number;
+};
+
+export type FieldConfigState = {
+  [id: string]: {
+    isVisible: boolean;
+    isInput: boolean; // false = output
+  };
+};
 
 export async function runCalculation(payload: {
   userName: string;
@@ -28,3 +45,178 @@ export async function updateSettings(nextSettings: SettingsConfig) {
   return getSettingsConfig();
 }
 
+export async function saveCalculation(payload: {
+  inputValues: any;
+  calculatedResults: any;
+}) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return { success: false, error: "Unauthorized" };
+
+    const { error } = await supabase
+      .from("calculations")
+      .insert({
+        user_id: user.id,
+        input_values: payload.inputValues,
+        // calculated_results: payload.calculatedResults, // Omitted to match DB schema changes
+      });
+
+    if (error) {
+      console.error("Supabase Insert Error:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("Server Action Exception (saveCalculation):", err);
+    return { success: false, error: err.message || "Unknown error" };
+  }
+}
+
+export async function getUserSettings(): Promise<SettingsConfig> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  const defaultSettings = { 
+    inputRows: [4, 5, 6, 19, 20, 21, 25, 30], 
+    outputRows: [76, 109, 114, 115, 116], 
+    percentageRows: [7, 25, 30],
+    monthlyRows: [],
+    vatRate: 0.17, 
+    profitMargin: 0.30 
+  };
+  
+  if (!user) return defaultSettings;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("display_settings")
+    .eq("id", user.id)
+    .single();
+
+  if (error) {
+    if (error.code !== "PGRST116") {
+      console.error("Error fetching settings from profiles:", error);
+    }
+    return defaultSettings;
+  }
+
+  const ds = data?.display_settings || {};
+  
+  return {
+    inputRows: ds.input_rows || defaultSettings.inputRows,
+    outputRows: ds.output_rows || defaultSettings.outputRows,
+    percentageRows: ds.percentage_rows || defaultSettings.percentageRows,
+    monthlyRows: ds.monthly_rows || [],
+    vatRate: ds.vat_rate || defaultSettings.vatRate,
+    profitMargin: ds.profit_margin || defaultSettings.profitMargin
+  };
+}
+
+export async function updateUserSettings(settings: SettingsConfig) {
+  // Backwards compatibility for the old save method
+  return updateProfile({ display_settings: settings });
+}
+
+export async function updateProfile(data: any) {
+  const supabase = await createClient(); // וודא שהייבוא תקין
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) throw new Error('No user found');
+
+  // שליפת הנתונים בצורה הכי פשוטה שיש
+  const configToSave = data.field_configs || data;
+
+  console.log('--- SERVER SAVING START ---');
+  console.log('User ID:', user.id);
+  console.log('Payload:', configToSave);
+
+  const { data: updatedData, error } = await supabase
+    .from('profiles')
+    .upsert({ 
+      id: user.id, 
+      field_configs: configToSave,
+      email: user.email // הוספת המייל ליתר ביטחון
+    }, { onConflict: 'id' })
+    .select();
+
+  if (error) {
+    console.error('SERVER ERROR:', error);
+    throw error;
+  }
+
+  console.log('SERVER SUCCESS:', updatedData);
+  
+  revalidatePath("/");
+  revalidatePath("/admin");
+  
+  return { success: true };
+}
+
+export async function getUserProfile() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("ui_permissions, field_configs, display_settings")
+    .eq("id", user.id)
+    .single();
+
+  if (error) {
+    if (error.code !== "PGRST116") {
+      console.error("Error fetching profile:", error);
+    }
+    return { ui_permissions: {}, field_configs: {}, display_settings: {} }; // Safe Default
+  }
+
+  return { 
+    ...data,
+    field_configs: data?.field_configs || {},
+    display_settings: data?.display_settings || {}
+  };
+}
+
+export async function getCalculations() {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    // Attempting a simple select first to avoid issues with missing columns in joined profiles
+    const { data, error } = await supabase
+      .from("calculations")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching calculations:", error);
+      return [];
+    }
+
+    // Map to the UI format (HistoryLogEntry)
+    return data.map(item => {
+      const inputsStr = Object.entries(item.input_values || {})
+        .map(([key, value]) => `[שורה ${key}]: ${value}`)
+        .join("\n");
+
+      const resultsStr = Array.isArray(item.calculated_results)
+        ? item.calculated_results.map((r: any) => `${r.label}: ${r.value}`).join("\n")
+        : "חישוב בוצע";
+
+      return {
+        timestamp: item.created_at,
+        userName: user.email?.split('@')[0] || "משתמש",
+        inputs: inputsStr,
+        results: resultsStr
+      };
+    });
+  } catch (err) {
+    console.error("getCalculations error:", err);
+    return [];
+  }
+}
