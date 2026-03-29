@@ -32,16 +32,17 @@ export default function LoginPage() {
       })
 
       if (signInError) {
-        setError("אימייל או סיסמה שגויים. נסה שוב.")
-        setLoading(false)
+        console.error("Supabase Auth Error [Sign In]:", signInError.message, signInError.status, signInError.name);
+        setError("אימייל או סיסמה שגויים. נסה שוב.");
+        setLoading(false);
       } else {
-        router.refresh()
-        router.push("/")
+        router.refresh();
+        router.push("/");
       }
-    } catch (e) {
-      console.error("Login attempt failed:", e)
-      setError("חיבור לשרת נכשל. בדוק את החיבור לאינטרנט.")
-      setLoading(false)
+    } catch (e: any) {
+      console.error("Login attempt network/system crash:", e?.message || e);
+      setError("חיבור לשרת נכשל. בדוק את החיבור לאינטרנט.");
+      setLoading(false);
     }
   }
 

@@ -1,12 +1,17 @@
 import "./globals.css";
 import type { ReactNode } from "react";
+import { createClient } from "@/lib/supabase/server";
+import { LogoutButton } from "@/components/logout-button";
 
 export const metadata = {
   title: "מחשבון עלויות חכם",
   description: "מחשבון עלויות מקצועי מבוסס Google Sheets"
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
   return (
     <html lang="he" dir="rtl" suppressHydrationWarning={true}>
       <body className="min-h-screen bg-slate-50 relative selection:bg-blue-200">
@@ -19,6 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   מחשבון עלויות חכם
                 </h1>
               </div>
+              {user && <LogoutButton />}
             </div>
           </header>
           <main className="flex-1">
