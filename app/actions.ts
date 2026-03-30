@@ -9,6 +9,7 @@ import {
   type CalculationInput,
 } from "@/lib/google-sheets";
 import { revalidatePath } from "next/cache";
+import { runEngineV2FromDbRecord } from "@/lib/financial-engine-v2";
 
 export type SettingsConfig = {
   inputRows: number[];
@@ -38,6 +39,12 @@ export async function loadSettings(): Promise<SettingsConfig> {
 }
 
 export async function updateSettings(nextSettings: SettingsConfig) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user?.user_metadata?.role !== 'admin') {
+    throw new Error("Unauthorized: Admin role required");
+  }
+
   await saveSettingsConfig(nextSettings);
   // Force Next.js to refresh the UI immediately after settings update.
   revalidatePath("/");
@@ -225,4 +232,42 @@ export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
+}
+
+/**
+ * Server calculation to protect formulas and internal factors.
+ * This runs the engine on the server and returns only the final display values.
+ */
+export async function calculateResults(inputs: Record<string, number>) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
+
+    // Run the engine
+    const results = runEngineV2FromDbRecord(inputs);
+
+    // Whitelist: ONLY return fields defined in EXCEL_ROW_MAP or specific display keys
+    // Exclude sensitive intermediate factors like taxFactor (tax_33) and pricingDenominator (tax_34)
+    const whitelistedResults: Record<string, any> = {};
+    
+    const sensitiveKeys = new Set(["tax_33", "tax_34"]);
+    
+    (Object.keys(results) as Array<keyof typeof results>).forEach(key => {
+      // If it's a field_ or tax_ or recommended_ key, and NOT in the sensitive list
+      const keyStr = String(key);
+      if ((keyStr.startsWith("field_") || keyStr.startsWith("tax_") || keyStr.startsWith("recommended_") || keyStr.startsWith("min_") || keyStr.startsWith("target_") || keyStr === "net_profit_110") && !sensitiveKeys.has(keyStr)) {
+        whitelistedResults[keyStr] = results[key];
+      }
+    });
+
+    return { success: true, data: whitelistedResults };
+  } catch (err: any) {
+    console.error("Calculation Server Error:", err);
+    // Return a generic, respectful error message to the client
+    return { 
+      success: false, 
+      error: "אירעה שגיאה בעיבוד הנתונים. נא לוודא שכל השדות הוזנו כראוי או פנה למנהל המערכת." 
+    };
+  }
 }

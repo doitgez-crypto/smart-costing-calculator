@@ -44,17 +44,31 @@ export async function middleware(request: NextRequest) {
   }
 
   const isLoginPage = request.nextUrl.pathname.startsWith('/login')
+  const isAdminPage = request.nextUrl.pathname.startsWith('/admin')
 
+  // 1. If not logged in and trying to access anything but login, redirect to login
   if (!user && !isLoginPage) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
+  // 2. If logged in and trying to access login, redirect to home
   if (user && isLoginPage) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
+  }
+
+  // 3. Admin Route Protection (RBAC)
+  if (isAdminPage) {
+    const role = user?.user_metadata?.role
+    if (role !== 'admin') {
+      console.warn(`Unauthorized access attempt to /admin by ${user?.email} (role: ${role})`)
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse

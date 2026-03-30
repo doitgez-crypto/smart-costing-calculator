@@ -1,143 +1,126 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Spinner } from "@/components/ui/spinner"
-import { Lock, Mail, Eye, EyeOff } from "lucide-react"
-import { motion } from "framer-motion"
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
+import { Lock, Mail, Eye, EyeOff } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-  const router = useRouter()
-  const supabase = createClient()
+  const router = useRouter();
+  const supabase = createClient();
 
   async function handleLogin(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
     
     try {
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
-      })
+      });
 
       if (signInError) {
-        console.error("Supabase Auth Error [Sign In]:", signInError.message, signInError.status, signInError.name);
         setError("אימייל או סיסמה שגויים. נסה שוב.");
         setLoading(false);
       } else {
         router.refresh();
         router.push("/");
       }
-    } catch (e: any) {
-      console.error("Login attempt network/system crash:", e?.message || e);
+    } catch (err: any) {
       setError("חיבור לשרת נכשל. בדוק את החיבור לאינטרנט.");
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center p-4">
+    <div className="min-h-[90vh] flex items-center justify-center p-4">
       <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-md"
       >
-        <Card className="shadow-2xl border-white/60 bg-white/80 backdrop-blur-xl rounded-[2rem] overflow-hidden">
-          <CardHeader className="text-center pb-2 pt-8">
-            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 hover:scale-110 transition-transform shadow-inner">
-              <Lock className="w-8 h-8" />
+        <Card className="shadow-2xl border-white/60 bg-white/80 backdrop-blur-xl rounded-[2.5rem] overflow-hidden border">
+          <CardHeader className="text-center pb-2 pt-10">
+            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl">
+              <Lock className="w-10 h-10" />
             </div>
-            <CardTitle className="text-2xl font-bold text-slate-800">התחברות למערכת</CardTitle>
-            <p className="text-sm text-slate-500 mt-2">הזן את פרטי ההתחברות שלך כדי להמשיך</p>
+            <CardTitle className="text-3xl font-black text-slate-800 tracking-tight">
+              התחברות
+            </CardTitle>
+            <p className="text-slate-500 mt-2 font-medium">
+              כניסה למחשבון העלויות החכם
+            </p>
           </CardHeader>
-          <CardContent className="p-8">
-            <form onSubmit={handleLogin} className="space-y-6">
+          
+          <CardContent className="p-8 pt-6">
+            <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 block" htmlFor="email">
-                  אימייל
-                </label>
-                <div className="relative">
+                <label className="text-sm font-bold text-slate-700 mr-1 text-right block">אימייל</label>
+                <div className="relative group">
                   <Input
-                    id="email"
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 h-12 rounded-xl bg-white/50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 text-left placeholder:text-right"
-                    placeholder="name@company.com"
+                    className="pl-12 h-14 rounded-2xl bg-white/50 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all text-left"
+                    placeholder="your@email.com"
                     dir="ltr"
-                    disabled={loading}
                   />
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 block" htmlFor="password">
-                  סיסמה
-                </label>
-                <div className="relative">
+                <label className="text-sm font-bold text-slate-700 mr-1 text-right block">סיסמה</label>
+                <div className="relative group">
                   <Input
-                    id="password"
                     type={showPassword ? "text" : "password"}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-12 h-12 rounded-xl bg-white/50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 text-left"
+                    className="pl-12 h-14 rounded-2xl bg-white/50 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all text-left"
                     dir="ltr"
-                    disabled={loading}
                   />
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500" />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors focus:outline-none"
-                    title={showPassword ? "הסתר סיסמה" : "הצג סיסמה"}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors"
                   >
-                    {showPassword ? (
-                      <EyeOff className="w-5 h-5" />
-                    ) : (
-                      <Eye className="w-5 h-5" />
-                    )}
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
 
               {error && (
-                <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl border border-red-100 text-center">
+                <div className="p-4 rounded-2xl bg-red-50 border border-red-100 text-red-600 text-sm font-bold text-center">
                   {error}
                 </div>
               )}
 
               <Button 
                 type="submit" 
-                className="w-full h-12 text-lg font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md transition-all hover:shadow-lg disabled:opacity-70"
-                disabled={loading}
+                disabled={loading} 
+                className="w-full h-14 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98]"
               >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <Spinner /> מתחבר...
-                  </span>
-                ) : (
-                  "התחבר"
-                )}
+                {loading ? <Spinner className="w-6 h-6" /> : "כניסה למערכת"}
               </Button>
             </form>
           </CardContent>
         </Card>
       </motion.div>
     </div>
-  )
+  );
 }

@@ -2,6 +2,7 @@ import "./globals.css";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "@/components/logout-button";
+import { ClientSecurity } from "@/components/client-security";
 
 export const metadata = {
   title: "מחשבון עלויות חכם",
@@ -30,6 +31,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <main className="flex-1">
             <div className="max-w-5xl mx-auto px-4 py-8">{children}</div>
           </main>
+          <ClientSecurity />
         </div>
       </body>
     </html>

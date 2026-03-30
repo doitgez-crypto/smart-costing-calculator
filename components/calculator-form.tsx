@@ -10,9 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 
 import type { InputRow, OutputRow, CalculationInput } from "@/lib/google-sheets";
-import { saveCalculation } from "@/app/actions";
+import { saveCalculation, calculateResults } from "@/app/actions";
 import { type UserSettings } from "@/lib/calculator-engine";
-import { runEngineV2FromDbRecord } from "@/lib/financial-engine-v2";
 import { EXCEL_ROW_MAP } from "@/lib/excel-map";
 
 type Props = {
@@ -135,10 +134,18 @@ export function CalculatorForm({
 
       console.log('inputValues before save', engineInputs);
 
-      // 2. RUN LOCAL CALCULATION (INSTANT) WITH ENGINE V2
-      const engineResultsDb = runEngineV2FromDbRecord(engineInputs) as Record<string, any>;
+      setSyncing(true);
       
-      console.log('Engine Results:', engineResultsDb);
+      // 2. RUN SERVER CALCULATION (Protects formulas)
+      const res = await calculateResults(engineInputs);
+      
+      if (!res.success) {
+        throw new Error(res.error || "נכשלה טעינת נתונים");
+      }
+
+      const engineResultsDb = res.data!;
+      
+      console.log('Engine Results (Server):', engineResultsDb);
 
       // 3. Update UI Immediately (Optimistic)
       console.log("inputValues.tax_19", engineInputs?.tax_19);
@@ -169,9 +176,11 @@ export function CalculatorForm({
         // We don't show this error to the user because it's background
       });
 
-    } catch (e) {
+    } catch (e: any) {
       console.error("Calculation logic error:", e);
-      setError("אירעה שגיאה בחישוב המקומי. נא לוודא שכל השדות הוזנו נכון.");
+      setError(e.message || "אירעה שגיאה בחישוב. נא לוודא שכל השדות הוזנו נכון.");
+    } finally {
+      setSyncing(false);
     }
   };
 
