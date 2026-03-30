@@ -30,7 +30,7 @@ function round2(num: number): number {
   return Math.round((num + Number.EPSILON) * 100) / 100;
 }
 
-export function calculateV2(inputs: EngineV2Inputs) {
+function calculateCore(inputs: EngineV2Inputs): any {
   const i = { ...inputs };
 
   // כאן המנוע עובד עם ערכים עשרוניים
@@ -65,7 +65,7 @@ export function calculateV2(inputs: EngineV2Inputs) {
   const pricingDenominator = (1 - comm - clear) * taxFactor - target;
 
   if (pricingDenominator <= 0) {
-    throw new Error("יעד רווח לא ריאלי");
+    throw new Error("יעד רווח לא ריאלי - המכנה שלילי");
   }
 
   const targetPriceNet = round2((baseCost * taxFactor) / pricingDenominator);
@@ -116,6 +116,25 @@ export function calculateV2(inputs: EngineV2Inputs) {
   const recommendedPriceInclVat = round2(recommendedPriceNet * (1 + vat));
   const actualNetProfitPercent = recommendedPriceNet > 0 ? recNetProfit / recommendedPriceNet : 0;
 
+  // --- NEW: Break-even & Safety Margin (Industrial Standards) ---
+  const variableCostPerUnit = round2(
+    totalDirectCosts + 
+    i.otherVariableCostFixed + 
+    (i.commissionRate + i.clearingRate) * recommendedPriceNet
+  );
+  
+  const contributionMarginPerUnit = round2(recommendedPriceNet - variableCostPerUnit);
+  
+  const breakEvenUnits = contributionMarginPerUnit > 0 
+    ? round2(totalMonthlyOverhead / contributionMarginPerUnit)
+    : 0;
+    
+  const safetyMarginPercent = i.monthlyUnits > 0 
+    ? round2(((i.monthlyUnits - breakEvenUnits) / i.monthlyUnits) * 100)
+    : 0;
+
+  const netProfitPerUnit = round2(recNetProfit / (i.monthlyUnits || 1));
+
   return {
     totalDirectCosts,
     totalMonthlyOverhead,
@@ -151,7 +170,39 @@ export function calculateV2(inputs: EngineV2Inputs) {
     recNetProfit,
     recNetProfitAfterFinancing,
     recommendedPriceInclVat,
-    actualNetProfitPercent
+    actualNetProfitPercent,
+    // New Metrics
+    breakEvenUnits,
+    safetyMarginPercent,
+    netProfitPerUnit
+  };
+}
+
+export function calculateV2(inputs: EngineV2Inputs): any {
+  const r = calculateCore(inputs);
+  
+  // --- Sensitivity/Elasticity Analysis (FIXED: No Recursion) ---
+  // Using calculateCore instead of calculateV2 to avoid RangeError
+  const calcNetProfit = (inputsMod: EngineV2Inputs) => calculateCore(inputsMod).recNetProfit;
+  
+  const baseProfit = r.recNetProfit;
+  const delta = 0.05;
+
+  const getImpact = (key: keyof EngineV2Inputs) => {
+    const modPlus = { ...inputs, [key]: Number(inputs[key as keyof EngineV2Inputs]) * (1 + delta) };
+    const profitPlus = calcNetProfit(modPlus);
+    return ((profitPlus - baseProfit) / (baseProfit || 1));
+  };
+
+  const sensitivity = {
+    rawMaterials: getImpact("rawMaterials"),
+    directLabor: getImpact("directLabor"),
+    competitorPrice: getImpact("competitorPrice"),
+  };
+
+  return {
+    ...r,
+    sensitivity
   };
 }
 

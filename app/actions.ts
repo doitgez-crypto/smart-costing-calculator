@@ -244,30 +244,62 @@ export async function calculateResults(inputs: Record<string, number>) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
+    // Debug: Input reveal
+    console.log("--- Calculation Server Input ---", inputs);
+
     // Run the engine
     const results = runEngineV2FromDbRecord(inputs);
 
-    // Whitelist: ONLY return fields defined in EXCEL_ROW_MAP or specific display keys
-    // Exclude sensitive intermediate factors like taxFactor (tax_33) and pricingDenominator (tax_34)
+    // Whitelist Audit: Ensure all keys needed for standard and advanced UI are included.
     const whitelistedResults: Record<string, any> = {};
-    
     const sensitiveKeys = new Set(["tax_33", "tax_34"]);
     
     (Object.keys(results) as Array<keyof typeof results>).forEach(key => {
-      // If it's a field_ or tax_ or recommended_ key, and NOT in the sensitive list
       const keyStr = String(key);
-      if ((keyStr.startsWith("field_") || keyStr.startsWith("tax_") || keyStr.startsWith("recommended_") || keyStr.startsWith("min_") || keyStr.startsWith("target_") || keyStr === "net_profit_110") && !sensitiveKeys.has(keyStr)) {
+      const isDisplayKey = 
+        keyStr.startsWith("field_") || 
+        keyStr.startsWith("tax_") || 
+        keyStr.startsWith("recommended_") || 
+        keyStr.startsWith("min_") || 
+        keyStr.startsWith("target_") || 
+        keyStr === "net_profit_110";
+
+      if (isDisplayKey && !sensitiveKeys.has(keyStr)) {
         whitelistedResults[keyStr] = results[key];
       }
     });
 
+    // Debug: Output reveal
+    console.log("--- Calculation Whitelisted Output ---", whitelistedResults);
+
+    // BACKGROUND PERSISTENCE: Save to History without awaiting or blocking the return.
+    // This allows the user to see results instantly even if Prisma lags or history table is huge.
+    if (process.env.DATABASE_URL) {
+      import("@/lib/actions/calculations").then(async ({ saveCalculation }) => {
+        try {
+          await saveCalculation({
+            userId: user.id || "",
+            title: `חישוב מתאריך ${new Date().toLocaleDateString('he-IL')}`,
+            inputs: inputs,
+            outputs: whitelistedResults
+          });
+          console.log(`✅ Background save successful for user ${user.id}`);
+        } catch (dbErr) {
+          console.error("⚠️ Background history save failed (Non-blocking):", dbErr);
+        }
+      });
+    }
+
     return { success: true, data: whitelistedResults };
   } catch (err: any) {
     console.error("Calculation Server Error:", err);
-    // Return a generic, respectful error message to the client
     return { 
       success: false, 
       error: "אירעה שגיאה בעיבוד הנתונים. נא לוודא שכל השדות הוזנו כראוי או פנה למנהל המערכת." 
     };
   }
+}
+
+export async function isDatabaseConfigured() {
+  return !!process.env.DATABASE_URL;
 }

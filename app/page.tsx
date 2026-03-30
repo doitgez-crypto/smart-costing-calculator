@@ -6,16 +6,25 @@ import { Settings as SettingsIcon, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getUserSettings, getUserProfile, type SettingsConfig } from "@/app/actions";
 
+import { getCalculationById } from "@/lib/actions/calculations";
+
 export const metadata: Metadata = {
   title: "מחשבון עלויות חכם"
 };
 
 export const revalidate = 0;
 
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams: { load?: string } }) {
   const supabase = await createClient();
   let user = null;
   let userName = "משתמש";
+
+  const loadId = searchParams.load;
+  let loadedData = null;
+  
+  if (loadId && process.env.DATABASE_URL) {
+    loadedData = await getCalculationById(loadId);
+  }
 
   try {
     const { data } = await supabase.auth.getUser();
@@ -82,6 +91,7 @@ export default async function Page() {
           profitMargin: settings.profitMargin ?? 0.30
         }}
         initialPermissions={profile?.ui_permissions || {}}
+        loadedCalculation={loadedData}
       />
     </div>
   );

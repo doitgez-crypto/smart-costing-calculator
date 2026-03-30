@@ -2,15 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Calculator, RefreshCcw, X } from "lucide-react";
+import { Calculator, RefreshCcw, X, Save, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 
-import type { InputRow, OutputRow, CalculationInput } from "@/lib/google-sheets";
-import { saveCalculation, calculateResults } from "@/app/actions";
+import { type InputRow, OutputRow, CalculationInput } from "@/lib/google-sheets";
+import { calculateResults } from "@/app/actions";
+import { saveCalculation } from "@/lib/actions/calculations";
 import { type UserSettings } from "@/lib/calculator-engine";
 import { EXCEL_ROW_MAP } from "@/lib/excel-map";
 
@@ -20,6 +21,7 @@ type Props = {
   initialUserName?: string;
   initialSettings?: UserSettings;
   initialPermissions?: Record<number, "editable" | "readonly" | "hidden" | string>;
+  loadedCalculation?: any;
 };
 
 export function CalculatorForm({
@@ -27,7 +29,8 @@ export function CalculatorForm({
   initialOutputs,
   initialUserName,
   initialSettings,
-  initialPermissions
+  initialPermissions,
+  loadedCalculation
 }: Props) {
   const containerVariants: any = {
     hidden: { opacity: 0 },
@@ -58,6 +61,9 @@ export function CalculatorForm({
 
   const [outputs, setOutputs] = useState<OutputRow[]>(initialOutputs || []);
   const [syncing, setSyncing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
+  const [calcTitle, setCalcTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [userSettings] = useState<UserSettings>(initialSettings || { vatRate: 0.17, profitMargin: 0.30 });
@@ -96,6 +102,40 @@ export function CalculatorForm({
   const [resultsOpen, setResultsOpen] = useState(false);
 
   useEffect(() => setHasMounted(true), []);
+
+  // Handle Loading Historical Data
+  useEffect(() => {
+    if (loadedCalculation && hasMounted) {
+      console.log("Loading calculation data into form...", loadedCalculation.id);
+      
+      const loadedInputs = loadedCalculation.inputs || {};
+      const newInputs = [...inputs];
+      
+      // Update inputs state
+      const updatedInputs = newInputs.map(i => {
+        const fieldDef = EXCEL_ROW_MAP[i.rowIndex];
+        if (fieldDef && loadedInputs[fieldDef.id] !== undefined) {
+          return { ...i, value: String(loadedInputs[fieldDef.id]) };
+        }
+        return i;
+      });
+      
+      setInputs(updatedInputs);
+      setCalcTitle(loadedCalculation.title || "");
+      
+      // If outputs are also saved, update them
+      if (loadedCalculation.outputs) {
+        const mappedOutputs: OutputRow[] = initialOutputs.map(out => {
+          if (loadedCalculation.outputs[out.rowIndex]) {
+            return { ...out, value: String(loadedCalculation.outputs[out.rowIndex]) };
+          }
+          return out;
+        });
+        setOutputs(mappedOutputs);
+        setResultsOpen(true);
+      }
+    }
+  }, [loadedCalculation, hasMounted]);
 
   const inputByRowIndex = useMemo(() => {
     const map = new Map<number, { value: string; isPercentage: boolean }>();
@@ -164,16 +204,17 @@ export function CalculatorForm({
       const now = new Date();
       setLastUpdated(now.toLocaleTimeString("he-IL"));
 
-      // 5. Save to DB in background
-      console.log("Triggering background save to Supabase...");
+      // 5. Save to History in background automatically
+      console.log("Triggering automatic history save...");
       saveCalculation({
-        inputValues: engineInputs,
-        calculatedResults: engineResultsDb,
+        userId: "", // Handled by session check in server action
+        title: `חישוב אוטומטי - ${now.toLocaleTimeString("he-IL")}`,
+        inputs: engineInputs,
+        outputs: engineResultsDb,
       }).then(() => {
-        console.log("Background save successful");
+        console.log("Auto-save successful");
       }).catch(err => {
-        console.error("Failed to save calculation to background DB:", err);
-        // We don't show this error to the user because it's background
+        console.error("Auto-save failed:", err);
       });
 
     } catch (e: any) {
@@ -181,6 +222,44 @@ export function CalculatorForm({
       setError(e.message || "אירעה שגיאה בחישוב. נא לוודא שכל השדות הוזנו נכון.");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!userName) return;
+    setSaving(true);
+    setSaveStatus(null);
+    
+    try {
+      const engineInputs: Record<string, number> = {};
+      inputs.forEach(i => {
+        const fieldDef = EXCEL_ROW_MAP[i.rowIndex];
+        if (fieldDef && i.value !== "") engineInputs[fieldDef.id] = Number(i.value);
+      });
+
+      // Find user ID from some metadata or assume it's available via session in server action
+      // For now, we pass a placeholder and the server action will validate via session anyway
+      const res = await saveCalculation({
+        userId: "", // Handled by session check in server action
+        title: calcTitle || `חישוב - ${new Date().toLocaleDateString('he-IL')}`,
+        inputs: engineInputs,
+        outputs: outputs.reduce((acc, curr) => ({ ...acc, [curr.rowIndex]: curr.value }), {})
+      });
+
+      if (res.success) {
+        setSaveStatus({ type: 'success', msg: "החישוב נשמר בהצלחה בהיסטוריה!" });
+        setCalcTitle("");
+      } else {
+        if (res.error === 'DB_UNCONFIGURED' || res.error === 'DB_CONNECTION_ERROR') {
+          setSaveStatus({ type: 'error', msg: "שירות ההיסטוריה לא זמין: חסר חיבור למסד הנתונים (DATABASE_URL)." });
+        } else {
+          setSaveStatus({ type: 'error', msg: res.error || "שגיאה בשמירה" });
+        }
+      }
+    } catch (e: any) {
+      setSaveStatus({ type: 'error', msg: "אירעה שגיאה בלתי צפויה בשמירה" });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -296,6 +375,40 @@ export function CalculatorForm({
                   </CardHeader>
                   <CardContent>
                     <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4 pt-1">
+                      
+                      {/* Save Calculation Section */}
+                      {!syncing && outputs.length > 0 && (
+                        <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50 space-y-3 mb-2">
+                           <div className="flex flex-col gap-2">
+                              <Label className="text-xs font-bold text-blue-800 pr-1">שם לחישוב (אופציונלי)</Label>
+                              <Input 
+                                placeholder="לדוגמה: פרוייקט א' - מרץ" 
+                                className="h-9 text-sm rounded-xl bg-white/80 border-blue-200 focus:ring-blue-500/20"
+                                value={calcTitle}
+                                onChange={(e) => setCalcTitle(e.target.value)}
+                              />
+                           </div>
+                           <Button 
+                             onClick={handleSave} 
+                             disabled={saving}
+                             className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
+                           >
+                             {saving ? <Spinner /> : <Save className="w-4 h-4" />}
+                             {saving ? "שומר..." : "שמור להיסטוריה"}
+                           </Button>
+                           {saveStatus && (
+                             <motion.div 
+                               initial={{ opacity: 0, y: -10 }} 
+                               animate={{ opacity: 1, y: 0 }}
+                               className={`flex items-center gap-2 text-[11.5px] font-medium justify-center ${saveStatus.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}
+                             >
+                               {saveStatus.type === 'success' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                               {saveStatus.msg}
+                             </motion.div>
+                           )}
+                        </div>
+                      )}
+
                       {readonlyOutputs.map((o) => {
                          // Find the calculated value for this row index (if any)
                          const calculatedVal = outputs.find(res => res.rowIndex === o.rowIndex)?.value || o.value;

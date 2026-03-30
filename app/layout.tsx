@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "@/components/logout-button";
 import { ClientSecurity } from "@/components/client-security";
+import { Calculator, History, BarChart3 } from "lucide-react";
+import Link from "next/link";
 
 export const metadata = {
   title: "מחשבון עלויות חכם",
@@ -20,12 +22,23 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <div className="min-h-screen flex flex-col relative z-0">
           <header className="border-b border-white/40 bg-white/70 backdrop-blur-md sticky top-0 z-50">
             <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
-              <div>
-                <h1 className="text-lg font-semibold text-gray-900">
-                  מחשבון עלויות חכם
-                </h1>
+              <div className="flex items-center gap-6">
+                <nav className="hidden md:flex items-center gap-1 bg-slate-100/50 p-1 rounded-xl border border-slate-200/50">
+                  <Link href="/" className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-sm transition-all">
+                    <Calculator className="w-4 h-4" />
+                    מחשבון
+                  </Link>
+                  <Link href="/history" className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-sm transition-all">
+                    <History className="w-4 h-4" />
+                    היסטוריה
+                  </Link>
+                  <Link href="/dashboard" className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-sm transition-all">
+                    <BarChart3 className="w-4 h-4" />
+                    אסטרטגיה
+                  </Link>
+                </nav>
+                {user && <LogoutButton />}
               </div>
-              {user && <LogoutButton />}
             </div>
           </header>
           <main className="flex-1">
