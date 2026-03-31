@@ -278,7 +278,6 @@ export async function calculateResults(inputs: Record<string, number>) {
       import("@/lib/actions/calculations").then(async ({ saveCalculation }) => {
         try {
           await saveCalculation({
-            userId: user.id || "",
             title: `חישוב מתאריך ${new Date().toLocaleDateString('he-IL')}`,
             inputs: inputs,
             outputs: whitelistedResults

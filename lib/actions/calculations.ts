@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 export async function saveCalculation(payload: {
-  userId: string;
   title: string;
   inputs: any;
   outputs: any;
@@ -18,22 +17,21 @@ export async function saveCalculation(payload: {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // IDOR Protection: Validate that the session user matches the requested userId
-    if (!user || user.id !== payload.userId) {
-      console.error("Unauthorized calculation save attempt");
-      return { success: false, error: "Unauthorized: You can only save your own calculations." };
+    if (!user) {
+      console.error("Unauthenticated calculation save attempt");
+      return { success: false, error: "Log in to save calculations." };
     }
 
     const calculation = await prisma.calculation.create({
       data: {
-        userId: payload.userId,
+        userId: user.id,
         title: payload.title || "חישוב ללא שם",
         inputs: payload.inputs,
         outputs: payload.outputs,
       },
     });
 
-    console.log(`✅ Calculation saved: ${calculation.id} for user ${payload.userId}`);
+    console.log(`✅ Calculation saved: ${calculation.id} for user ${user.id}`);
     
     revalidatePath("/history");
     return { success: true, id: calculation.id };

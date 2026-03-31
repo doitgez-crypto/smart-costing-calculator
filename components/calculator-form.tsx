@@ -207,7 +207,6 @@ export function CalculatorForm({
       // 5. Save to History in background automatically
       console.log("Triggering automatic history save...");
       saveCalculation({
-        userId: "", // Handled by session check in server action
         title: `חישוב אוטומטי - ${now.toLocaleTimeString("he-IL")}`,
         inputs: engineInputs,
         outputs: engineResultsDb,
@@ -240,7 +239,6 @@ export function CalculatorForm({
       // Find user ID from some metadata or assume it's available via session in server action
       // For now, we pass a placeholder and the server action will validate via session anyway
       const res = await saveCalculation({
-        userId: "", // Handled by session check in server action
         title: calcTitle || `חישוב - ${new Date().toLocaleDateString('he-IL')}`,
         inputs: engineInputs,
         outputs: outputs.reduce((acc, curr) => ({ ...acc, [curr.rowIndex]: curr.value }), {})
