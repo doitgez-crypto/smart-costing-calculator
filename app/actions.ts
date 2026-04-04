@@ -52,35 +52,8 @@ export async function updateSettings(nextSettings: SettingsConfig) {
   return getSettingsConfig();
 }
 
-export async function saveCalculation(payload: {
-  inputValues: any;
-  calculatedResults: any;
-}) {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) return { success: false, error: "Unauthorized" };
-
-    const { error } = await supabase
-      .from("calculations")
-      .insert({
-        user_id: user.id,
-        input_values: payload.inputValues,
-        // calculated_results: payload.calculatedResults, // Omitted to match DB schema changes
-      });
-
-    if (error) {
-      console.error("Supabase Insert Error:", error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true };
-  } catch (err: any) {
-    console.error("Server Action Exception (saveCalculation):", err);
-    return { success: false, error: err.message || "Unknown error" };
-  }
-}
+// Note: Redundant saveCalculation and getCalculations removed. 
+// Use '@/lib/actions/calculations' instead for Prisma-backed history.
 
 export async function getUserSettings(): Promise<SettingsConfig> {
   const supabase = await createClient();
@@ -187,46 +160,7 @@ export async function getUserProfile() {
   };
 }
 
-export async function getCalculations() {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
-
-    // Attempting a simple select first to avoid issues with missing columns in joined profiles
-    const { data, error } = await supabase
-      .from("calculations")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Error fetching calculations:", error);
-      return [];
-    }
-
-    // Map to the UI format (HistoryLogEntry)
-    return data.map(item => {
-      const inputsStr = Object.entries(item.input_values || {})
-        .map(([key, value]) => `[שורה ${key}]: ${value}`)
-        .join("\n");
-
-      const resultsStr = Array.isArray(item.calculated_results)
-        ? item.calculated_results.map((r: any) => `${r.label}: ${r.value}`).join("\n")
-        : "חישוב בוצע";
-
-      return {
-        timestamp: item.created_at,
-        userName: user.email?.split('@')[0] || "משתמש",
-        inputs: inputsStr,
-        results: resultsStr
-      };
-    });
-  } catch (err) {
-    console.error("getCalculations error:", err);
-    return [];
-  }
-}
+// History operations moved to lib/actions/calculations.ts
 
 export async function signOut() {
   const supabase = await createClient();
@@ -275,6 +209,7 @@ export async function calculateResults(inputs: Record<string, number>) {
     // BACKGROUND PERSISTENCE: Save to History without awaiting or blocking the return.
     // This allows the user to see results instantly even if Prisma lags or history table is huge.
     if (process.env.DATABASE_URL) {
+      // Use the unified Prisma action
       import("@/lib/actions/calculations").then(async ({ saveCalculation }) => {
         try {
           await saveCalculation({
@@ -284,8 +219,10 @@ export async function calculateResults(inputs: Record<string, number>) {
           });
           console.log(`✅ Background save successful for user ${user.id}`);
         } catch (dbErr) {
-          console.error("⚠️ Background history save failed (Non-blocking):", dbErr);
+          console.error("⚠️ Background history save failed:", dbErr);
         }
+      }).catch(err => {
+        console.error("⚠️ Failed to import calculations action:", err);
       });
     }
 

@@ -22,12 +22,12 @@ export async function saveCalculation(payload: {
       return { success: false, error: "Log in to save calculations." };
     }
 
-    const calculation = await prisma.calculation.create({
+    const calculation = await prisma.calculations.create({
       data: {
-        userId: user.id,
-        title: payload.title || "חישוב ללא שם",
+        user_id: user.id,
+        project_name: payload.title || "חישוב ללא שם",
         inputs: payload.inputs,
-        outputs: payload.outputs,
+        results: payload.outputs,
       },
     });
 
@@ -53,12 +53,20 @@ export async function getCalculations() {
 
     if (!user) return [];
 
-    const history = await prisma.calculation.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' }
+    const history = await prisma.calculations.findMany({
+      where: { user_id: user.id },
+      orderBy: { created_at: 'desc' }
     });
 
-    return history;
+    // Map to UI format
+    return history.map(item => ({
+      id: item.id,
+      title: item.project_name || "חישוב ללא שם",
+      createdAt: item.created_at,
+      inputs: item.inputs,
+      results: item.results,
+      userId: item.user_id
+    }));
   } catch (error: any) {
     console.error("Error fetching calculations:", error.message);
     return [];
@@ -74,11 +82,11 @@ export async function deleteCalculation(id: string) {
 
     if (!user) throw new Error("Unauthorized");
 
-    // IDOR Protection via 'where' clause including userId
-    await prisma.calculation.delete({
+    // IDOR Protection via 'where' clause including user_id
+    await prisma.calculations.delete({
       where: {
         id,
-        userId: user.id
+        user_id: user.id
       }
     });
 
@@ -97,10 +105,10 @@ export async function getCalculationById(id: string) {
 
     if (!user) return null;
 
-    const calculation = await prisma.calculation.findUnique({
+    const calculation = await prisma.calculations.findUnique({
       where: {
         id,
-        userId: user.id
+        user_id: user.id
       }
     });
 
