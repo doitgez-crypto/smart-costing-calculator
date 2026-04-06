@@ -64,6 +64,7 @@ export function CalculatorForm({
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
   const [calcTitle, setCalcTitle] = useState("");
+  const [lastCalculatedResults, setLastCalculatedResults] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [userSettings] = useState<UserSettings>(initialSettings || { vatRate: 0.17, profitMargin: 0.30 });
@@ -121,13 +122,15 @@ export function CalculatorForm({
       });
       
       setInputs(updatedInputs);
-      setCalcTitle(loadedCalculation.title || "");
+      setCalcTitle(loadedCalculation.project_name || "");
       
-      // If outputs are also saved, update them
-      if (loadedCalculation.outputs) {
+      // If results are also saved, update them
+      const savedResults = loadedCalculation.results;
+      if (savedResults) {
         const mappedOutputs: OutputRow[] = initialOutputs.map(out => {
-          if (loadedCalculation.outputs[out.rowIndex]) {
-            return { ...out, value: String(loadedCalculation.outputs[out.rowIndex]) };
+          const fieldDef = EXCEL_ROW_MAP[out.rowIndex];
+          if (fieldDef && savedResults[fieldDef.id] !== undefined) {
+             return { ...out, value: String(savedResults[fieldDef.id]) };
           }
           return out;
         });
@@ -184,6 +187,7 @@ export function CalculatorForm({
       }
 
       const engineResultsDb = res.data!;
+      setLastCalculatedResults(engineResultsDb);
       
       console.log('Engine Results (Server):', engineResultsDb);
 
@@ -207,9 +211,9 @@ export function CalculatorForm({
       // 5. Save to History in background automatically
       console.log("Triggering automatic history save...");
       saveCalculation({
-        title: `חישוב אוטומטי - ${now.toLocaleTimeString("he-IL")}`,
+        project_name: `חישוב אוטומטי - ${now.toLocaleTimeString("he-IL")}`,
         inputs: engineInputs,
-        outputs: engineResultsDb,
+        results: engineResultsDb,
       }).then(() => {
         console.log("Auto-save successful");
       }).catch(err => {
@@ -239,9 +243,9 @@ export function CalculatorForm({
       // Find user ID from some metadata or assume it's available via session in server action
       // For now, we pass a placeholder and the server action will validate via session anyway
       const res = await saveCalculation({
-        title: calcTitle || `חישוב - ${new Date().toLocaleDateString('he-IL')}`,
+        project_name: calcTitle || `חישוב - ${new Date().toLocaleDateString('he-IL')}`,
         inputs: engineInputs,
-        outputs: outputs.reduce((acc, curr) => ({ ...acc, [curr.rowIndex]: curr.value }), {})
+        results: lastCalculatedResults || {} 
       });
 
       if (res.success) {

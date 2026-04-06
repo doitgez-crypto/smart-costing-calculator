@@ -14,12 +14,14 @@ export const metadata: Metadata = {
 
 export const revalidate = 0;
 
-export default async function Page({ searchParams }: { searchParams: { load?: string } }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const supabase = await createClient();
   let user = null;
   let userName = "משתמש";
 
-  const loadId = searchParams.load;
+  const params = await searchParams;
+  const rawLoadId = params.load;
+  const loadId = Array.isArray(rawLoadId) ? rawLoadId[0] : rawLoadId;
   let loadedData = null;
   
   if (loadId && process.env.DATABASE_URL) {

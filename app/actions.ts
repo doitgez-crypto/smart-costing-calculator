@@ -213,9 +213,9 @@ export async function calculateResults(inputs: Record<string, number>) {
       import("@/lib/actions/calculations").then(async ({ saveCalculation }) => {
         try {
           await saveCalculation({
-            title: `חישוב מתאריך ${new Date().toLocaleDateString('he-IL')}`,
+            project_name: `חישוב מתאריך ${new Date().toLocaleDateString('he-IL')}`,
             inputs: inputs,
-            outputs: whitelistedResults
+            results: whitelistedResults
           });
           console.log(`✅ Background save successful for user ${user.id}`);
         } catch (dbErr) {

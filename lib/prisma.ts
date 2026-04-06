@@ -1,3 +1,4 @@
+import 'server-only';
 import { PrismaClient } from "@/generated/prisma"
 import { PrismaPg } from "@prisma/adapter-pg"
 import pg from "pg"
@@ -5,7 +6,11 @@ import pg from "pg"
 const prismaClientSingleton = () => {
   const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
   const adapter = new PrismaPg(pool)
-  return new PrismaClient({ adapter, log: ["error"] })
+  
+  return new PrismaClient({ 
+    adapter, 
+    log: ["error"]
+  })
 }
 
 declare global {
