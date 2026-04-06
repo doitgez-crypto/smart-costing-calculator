@@ -78,6 +78,13 @@ export async function getCalculations() {
 
     const history = await prisma.calculations.findMany({
       where: { user_id: user.id },
+      select: {
+        id: true,
+        project_name: true,
+        createdAt: true,
+        user_id: true
+        // Intentionally omitting 'inputs' and 'results' to reduce payload size
+      },
       orderBy: { createdAt: 'desc' }
     });
 
@@ -87,12 +94,53 @@ export async function getCalculations() {
       title: item.project_name || "חישוב ללא שם",
       project_name: item.project_name,
       createdAt: item.createdAt,
-      inputs: item.inputs,
-      results: item.results,
       userId: item.user_id
     }));
   } catch (error: any) {
     console.error("Error fetching calculations:", error.message);
+    return [];
+  }
+}
+
+export async function getLatestCalculationFull() {
+  if (!process.env.DATABASE_URL) return null;
+  
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return null;
+
+    const latest = await prisma.calculations.findFirst({
+      where: { user_id: user.id },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return latest;
+  } catch (error: any) {
+    console.error("Error fetching latest calculation:", error.message);
+    return null;
+  }
+}
+
+export async function getCalculationsFull() {
+  if (!process.env.DATABASE_URL) return [];
+  
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return [];
+
+    const history = await prisma.calculations.findMany({
+      where: { user_id: user.id },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // We do NOT omit inputs and results, this is explicitly for full aggregation
+    return history;
+  } catch (error: any) {
+    console.error("Error fetching full calculations:", error.message);
     return [];
   }
 }
@@ -140,5 +188,29 @@ export async function getCalculationById(id: string) {
   } catch (error: any) {
     console.error("Error fetching calculation by ID:", error.message);
     return null;
+  }
+}
+
+export async function bulkDeleteCalculations(ids: string[]) {
+  if (!process.env.DATABASE_URL) return { success: false, error: "DB_UNCONFIGURED" };
+
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) throw new Error("Unauthorized");
+
+    await prisma.calculations.deleteMany({
+      where: {
+        id: { in: ids },
+        user_id: user.id
+      }
+    });
+
+    revalidatePath("/history");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error bulk deleting calculations:", error.message);
+    return { success: false, error: error.message };
   }
 }

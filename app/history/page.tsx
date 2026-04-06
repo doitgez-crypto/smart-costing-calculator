@@ -1,58 +1,16 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Suspense } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { History, Calendar, Trash2, ArrowLeftRight, ExternalLink } from "lucide-react";
-import { getCalculations, deleteCalculation } from "@/lib/actions/calculations";
+import { getCalculations } from "@/lib/actions/calculations";
 import { isDatabaseConfigured } from "@/app/actions";
-import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { Database, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { HistoryClientView } from "./history-client";
 
-export default function HistoryPage() {
-  const [history, setHistory] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isDbLinked, setIsDbLinked] = useState(true);
-  const router = useRouter();
+export const revalidate = 0;
 
-  const loadHistory = async () => {
-    setLoading(true);
-    const dbStatus = await isDatabaseConfigured();
-    setIsDbLinked(dbStatus);
-    
-    if (dbStatus) {
-      const data = await getCalculations();
-      setHistory(data || []);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    loadHistory();
-  }, []);
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("האם למחוק חישוב זה מההיסטוריה?")) return;
-    const res = await deleteCalculation(id);
-    if (res.success) {
-      setHistory(prev => prev.filter(item => item.id !== id));
-    }
-  };
-
-  const handleLoad = (id: string) => {
-    router.push(`/?load=${id}`);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <Spinner />
-        <p className="text-slate-500 font-medium">טוען היסטוריית חישובים...</p>
-      </div>
-    );
-  }
+export default async function HistoryPage() {
+  const isDbLinked = await isDatabaseConfigured();
 
   if (!isDbLinked) {
     return (
@@ -77,90 +35,31 @@ export default function HistoryPage() {
            </ul>
         </div>
 
-        <Button onClick={() => router.push('/')} className="h-14 px-10 rounded-2xl bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-500/20 font-bold text-lg transition-all active:scale-95">
-          חזרה למחשבון (Standalone)
-        </Button>
+        <Link href="/">
+          <Button className="h-14 px-10 rounded-2xl bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-500/20 font-bold text-lg transition-all active:scale-95">
+            חזרה למחשבון (Standalone)
+          </Button>
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold text-slate-900 flex items-center gap-3">
-          <History className="w-8 h-8 text-blue-600" />
-          היסטוריית חישובים
-        </h1>
-        <div className="text-sm text-slate-500 bg-white/50 px-4 py-2 rounded-xl border border-white/60 shadow-sm">
-          {history.length} חישובים שמורים
+    <Suspense 
+      fallback={
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <Spinner />
+          <p className="text-slate-500 font-medium">טוען היסטוריית חישובים...</p>
         </div>
-      </div>
-
-      {history.length === 0 ? (
-        <Card className="border-dashed border-2 border-slate-200 bg-slate-50/50">
-          <CardContent className="flex flex-col items-center justify-center py-20 gap-4 text-slate-400">
-             <History className="w-16 h-16 opacity-20" />
-             <p className="text-lg font-medium">עדיין לא שמרת חישובים</p>
-             <Button onClick={() => router.push('/')} variant="outline" className="rounded-xl">
-                בצע חישוב ראשון
-             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {history.map((item, index) => (
-            <motion.div 
-              key={item.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
-              <Card className="group bg-white hover:border-blue-200 transition-all hover:shadow-xl hover:shadow-blue-500/5 rounded-2xl overflow-hidden border-slate-100">
-                <CardContent className="p-0">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 gap-6">
-                    <div className="space-y-1.5">
-                      <h3 className="font-bold text-lg text-slate-800">{item.title}</h3>
-                      <div className="flex items-center gap-4 text-xs text-slate-500">
-                        <span className="flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5" />
-                          {new Date(item.createdAt).toLocaleDateString('he-IL', { 
-                            day: 'numeric', 
-                            month: 'long', 
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                        <span className="flex items-center gap-1">
-                           ID: <span className="font-mono text-[10px]">{item.id.slice(0,8)}...</span>
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                       <Button 
-                         onClick={() => handleLoad(item.id)}
-                         className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all rounded-xl border-none font-bold text-sm h-11 px-6 shadow-sm flex items-center gap-2"
-                        >
-                          <ArrowLeftRight className="w-4 h-4" />
-                          טען למחשבון
-                        </Button>
-                        <Button 
-                          onClick={() => handleDelete(item.id)}
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl h-11 w-11 transition-colors"
-                        >
-                          <Trash2 className="w-4.5 h-4.5" />
-                        </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-      )}
-    </div>
+      }
+    >
+      <HistoryDataLoader />
+    </Suspense>
   );
+}
+
+// Separate component for data loading to boundary the Suspense gracefully
+async function HistoryDataLoader() {
+  const history = await getCalculations();
+  return <HistoryClientView initialHistory={history || []} />;
 }

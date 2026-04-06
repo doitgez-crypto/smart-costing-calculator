@@ -16,28 +16,14 @@ export const revalidate = 0;
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const supabase = await createClient();
-  let user = null;
-  let userName = "משתמש";
-
   const params = await searchParams;
   const rawLoadId = params.load;
   const loadId = Array.isArray(rawLoadId) ? rawLoadId[0] : rawLoadId;
+
+  // Resolve defaults
+  let user = null;
+  let userName = "משתמש";
   let loadedData = null;
-  
-  if (loadId && process.env.DATABASE_URL) {
-    loadedData = await getCalculationById(loadId);
-  }
-
-  try {
-    const { data } = await supabase.auth.getUser();
-    user = data.user;
-    if (user) {
-      userName = user.user_metadata?.first_name || user.email?.split('@')[0] || "משתמש";
-    }
-  } catch (err) {
-    console.error("Error fetching user in Root Page:", err);
-  }
-
   let settings: SettingsConfig = { 
     inputRows: [4, 5, 6, 19, 20, 21, 25, 30], 
     outputRows: [76, 109, 114, 115, 116], 
@@ -46,16 +32,26 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
     profitMargin: 0.30 
   };
   let profile = { ui_permissions: {}, field_configs: {}, display_settings: {} };
-  
+
   try {
-    const [s, p] = await Promise.all([
-      getUserSettings(),
-      getUserProfile()
+    // Parallelize all data fetching
+    const [authData, calcData, s, p] = await Promise.all([
+      supabase.auth.getUser().catch(() => ({ data: { user: null } })),
+      loadId && process.env.DATABASE_URL ? getCalculationById(loadId).catch(() => null) : Promise.resolve(null),
+      getUserSettings().catch(() => null),
+      getUserProfile().catch(() => null)
     ]);
+
+    user = authData.data?.user;
+    if (user) {
+      userName = user.user_metadata?.first_name || user.email?.split('@')[0] || "משתמש";
+    }
+
+    if (calcData) loadedData = calcData;
     if (s) settings = s;
     if (p) profile = p;
   } catch (err) {
-    console.error("Error loading Supabase data:", err);
+    console.error("Error fetching dependencies in Root Page:", err);
   }
 
   const { inputs, outputs } = getFieldsFromConfig(profile.field_configs, profile.display_settings || settings);

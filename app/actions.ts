@@ -206,26 +206,6 @@ export async function calculateResults(inputs: Record<string, number>) {
     // Debug: Output reveal
     console.log("--- Calculation Whitelisted Output ---", whitelistedResults);
 
-    // BACKGROUND PERSISTENCE: Save to History without awaiting or blocking the return.
-    // This allows the user to see results instantly even if Prisma lags or history table is huge.
-    if (process.env.DATABASE_URL) {
-      // Use the unified Prisma action
-      import("@/lib/actions/calculations").then(async ({ saveCalculation }) => {
-        try {
-          await saveCalculation({
-            project_name: `חישוב מתאריך ${new Date().toLocaleDateString('he-IL')}`,
-            inputs: inputs,
-            results: whitelistedResults
-          });
-          console.log(`✅ Background save successful for user ${user.id}`);
-        } catch (dbErr) {
-          console.error("⚠️ Background history save failed:", dbErr);
-        }
-      }).catch(err => {
-        console.error("⚠️ Failed to import calculations action:", err);
-      });
-    }
-
     return { success: true, data: whitelistedResults };
   } catch (err: any) {
     console.error("Calculation Server Error:", err);

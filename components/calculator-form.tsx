@@ -122,10 +122,10 @@ export function CalculatorForm({
       });
       
       setInputs(updatedInputs);
-      setCalcTitle(loadedCalculation.project_name || "");
+      setCalcTitle(loadedCalculation.project_name || loadedCalculation.title || "");
       
-      // If results are also saved, update them
-      const savedResults = loadedCalculation.results;
+      // If results are also saved, update them (with fallback to legacy 'outputs')
+      const savedResults = loadedCalculation.results || loadedCalculation.outputs;
       if (savedResults) {
         const mappedOutputs: OutputRow[] = initialOutputs.map(out => {
           const fieldDef = EXCEL_ROW_MAP[out.rowIndex];
@@ -203,22 +203,9 @@ export function CalculatorForm({
         }
         return { ...out, value: "0" };
       });
-      
       setOutputs(mappedOutputs);
       const now = new Date();
       setLastUpdated(now.toLocaleTimeString("he-IL"));
-
-      // 5. Save to History in background automatically
-      console.log("Triggering automatic history save...");
-      saveCalculation({
-        project_name: `חישוב אוטומטי - ${now.toLocaleTimeString("he-IL")}`,
-        inputs: engineInputs,
-        results: engineResultsDb,
-      }).then(() => {
-        console.log("Auto-save successful");
-      }).catch(err => {
-        console.error("Auto-save failed:", err);
-      });
 
     } catch (e: any) {
       console.error("Calculation logic error:", e);

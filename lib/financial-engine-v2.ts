@@ -62,10 +62,10 @@ function calculateCore(inputs: EngineV2Inputs): any {
   const baseCost = round2(totalDirectCosts + overheadPerUnit + i.otherVariableCostFixed);
 
   const taxFactor = (1 - incTax) * (1 - socSec);
-  const pricingDenominator = (1 - comm - clear) * taxFactor - target;
+  let pricingDenominator = (1 - comm - clear) * taxFactor - target;
 
   if (pricingDenominator <= 0) {
-    throw new Error("יעד רווח לא ריאלי - המכנה שלילי");
+    pricingDenominator = 0.0001; // Fallback to safe minimum instead of throwing to prevent NaN/crashes in UI rendering
   }
 
   const targetPriceNet = round2((baseCost * taxFactor) / pricingDenominator);
