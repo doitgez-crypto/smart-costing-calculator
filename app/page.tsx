@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Settings as SettingsIcon, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getUserSettings, getUserProfile, type SettingsConfig } from "@/app/actions";
+import { RefreshButton } from "@/components/refresh-button";
 
 import { getCalculationById } from "@/lib/actions/calculations";
 
@@ -78,6 +79,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
       >
         <SettingsIcon className="w-5 h-5 text-gray-700 group-hover:text-blue-600 transition-colors" />
       </Link>
+
+      <RefreshButton />
 
       <CalculatorForm 
         initialInputs={typedInputs as any} 

@@ -24,18 +24,18 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <header className="border-b border-white/40 bg-white/70 backdrop-blur-md sticky top-0 z-50">
               <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-6">
-                  <nav className="hidden md:flex items-center gap-1 bg-slate-100/50 p-1 rounded-xl border border-slate-200/50">
+                  <nav className="flex items-center gap-1 bg-slate-100/50 p-1 rounded-xl border border-slate-200/50">
                     <Link href="/" className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-sm transition-all">
                       <Calculator className="w-4 h-4" />
-                      מחשבון
+                      <span className="hidden md:inline">מחשבון</span>
                     </Link>
                     <Link href="/history" className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-sm transition-all">
                       <History className="w-4 h-4" />
-                      היסטוריה
+                      <span className="hidden md:inline">היסטוריה</span>
                     </Link>
                     <Link href="/dashboard" className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-sm transition-all">
                       <BarChart3 className="w-4 h-4" />
-                      אסטרטגיה
+                      <span className="hidden md:inline">אסטרטגיה</span>
                     </Link>
                   </nav>
                   <LogoutButton />
